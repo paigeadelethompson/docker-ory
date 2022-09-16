@@ -1,0 +1,94 @@
+#!/bin/bash
+
+if [ ! -f config/docker/.env ]; then
+  cp config/docker/examples/.env config/docker/.env
+fi
+
+cd or_cockroach
+
+docker run -it --rm -v cr_ca_certs:/certs -v cr_ca_priv:/my-safe-directory docker.io/cockroachdb/cockroach:latest cert create-ca --certs-dir=/certs --ca-key=/my-safe-directory/ca.key
+docker run -it --rm -v cr_ca_certs:/certs -v cr_ca_priv:/my-safe-directory -v cockroach1_certs:/export1 -v cockroach1_priv:/export2 ubuntu bash -c "cp -rvp /certs/* /export1 ; cp -rvp /my-safe-directory/* /export2"
+docker run -it --rm -v cr_ca_certs:/certs -v cr_ca_priv:/my-safe-directory -v cockroach2_certs:/export1 -v cockroach2_priv:/export2 ubuntu bash -c "cp -rvp /certs/* /export1 ; cp -rvp /my-safe-directory/* /export2"
+docker run -it --rm -v cr_ca_certs:/certs -v cr_ca_priv:/my-safe-directory -v cockroach3_certs:/export1 -v cockroach3_priv:/export2 ubuntu bash -c "cp -rvp /certs/* /export1 ; cp -rvp /my-safe-directory/* /export2"
+
+docker run -it --rm -v cockroach1_certs:/certs:rw -v cockroach1_priv:/my-safe-directory:rw docker.io/cockroachdb/cockroach:latest cert create-node 100.64.0.2 100.64.65.74 100.64.65.26 100.64.65 50 cockroach1 --certs-dir=/certs --ca-key=/my-safe-directory/ca.key
+docker run -it --rm -v cockroach2_certs:/certs:rw -v cockroach2_priv:/my-safe-directory:rw docker.io/cockroachdb/cockroach:latest cert create-node 100.64.0.3 100.64.65.75 100.64.65.34 100.64.65.58 cockroach2 --certs-dir=/certs --ca-key=/my-safe-directory/ca.key
+docker run -it --rm -v cockroach3_certs:/certs:rw -v cockroach3_priv:/my-safe-directory:rw docker.io/cockroachdb/cockroach:latest cert create-node 100.64.0.4 100.64.65.76 100.64.65.42 100.64.65.66 cockroach3 --certs-dir=/certs --ca-key=/my-safe-directory/ca.key
+
+docker run -it --rm -v cockroach1_certs:/certs:rw -v cockroach1_priv:/my-safe-directory:rw docker.io/cockroachdb/cockroach:latest cert create-client root --certs-dir=/certs --ca-key=/my-safe-directory/ca.key
+docker run -it --rm -v cockroach1_certs:/certs:rw -v cockroach1_priv:/my-safe-directory:rw docker.io/cockroachdb/cockroach:latest cert create-client hydra --certs-dir=/certs --ca-key=/my-safe-directory/ca.key
+docker run -it --rm -v cockroach1_certs:/certs:rw -v cockroach1_priv:/my-safe-directory:rw docker.io/cockroachdb/cockroach:latest cert create-client kratos --certs-dir=/certs --ca-key=/my-safe-directory/ca.key
+docker run -it --rm -v cockroach1_certs:/certs:rw -v cockroach1_priv:/my-safe-directory:rw docker.io/cockroachdb/cockroach:latest cert create-client keto --certs-dir=/certs --ca-key=/my-safe-directory/ca.key
+
+docker run -it --rm -v cr_ca_certs:/certs -v cr_ca_priv:/my-safe-directory -v cockroach2_certs:/export1 -v cockroach2_priv:/export2 ubuntu bash -c "rm /export2/ca.key"
+docker run -it --rm -v cr_ca_certs:/certs -v cr_ca_priv:/my-safe-directory -v cockroach3_certs:/export1 -v cockroach3_priv:/export2 ubuntu bash -c "rm /export2/ca.key"
+
+docker-compose up -d
+
+docker exec -it or_cockroach_cockroach1_1 cockroach init --certs-dir=/certs --host cockroach1
+
+docker exec -it or_cockroach_cockroach1_1 cockroach sql --host=cockroach1 --certs-dir=/certs -e "CREATE USER hydra WITH PASSWORD NULL"
+docker exec -it or_cockroach_cockroach1_1 cockroach sql --host=cockroach1 --certs-dir=/certs -e "CREATE USER kratos WITH PASSWORD NULL"
+docker exec -it or_cockroach_cockroach1_1 cockroach sql --host=cockroach1 --certs-dir=/certs -e "CREATE USER keto WITH PASSWORD NULL"
+docker exec -it or_cockroach_cockroach1_1 cockroach sql --host=cockroach1 --certs-dir=/certs -e "CREATE DATABASE IF NOT EXISTS hydra"
+docker exec -it or_cockroach_cockroach1_1 cockroach sql --host=cockroach1 --certs-dir=/certs -e "CREATE DATABASE IF NOT EXISTS kratos"
+docker exec -it or_cockroach_cockroach1_1 cockroach sql --host=cockroach1 --certs-dir=/certs -e "CREATE DATABASE IF NOT EXISTS keto"
+docker exec -it or_cockroach_cockroach1_1 cockroach sql --host=cockroach1 --certs-dir=/certs -e "GRANT ALL ON DATABASE hydra to hydra"
+docker exec -it or_cockroach_cockroach1_1 cockroach sql --host=cockroach1 --certs-dir=/certs -e "GRANT ALL ON DATABASE kratos to kratos"
+docker exec -it or_cockroach_cockroach1_1 cockroach sql --host=cockroach1 --certs-dir=/certs -e "GRANT ALL ON DATABASE keto to keto"
+
+docker run -it --rm -v hydra_certs:/export -v cockroach1_certs:/priv ubuntu bash -c "cp /priv/*.hydra.* /export ; cp /priv/ca.crt /export"
+docker run -it --rm -v hydra_certs:/export alpine/openssl genrsa -out /export/https.pem 4096
+docker run -it --rm -v hydra_certs:/export alpine/openssl req -new -x509 -sha256 -key /export/https.pem -out /export/https.crt -days 3650 -subj "/C=GB/ST=London/L=London/O=Global Security/OU=IT Department/CN=example.com"
+docker run -it --rm -v hydra_certs:/export ubuntu bash -c "chmod -R 777 /export/"
+
+docker run -it --rm -v kratos_certs:/export -v cockroach1_certs:/priv ubuntu bash -c "cp /priv/*.kratos.* /export ; cp /priv/ca.crt /export"
+docker run -it --rm -v kratos_certs:/export alpine/openssl genrsa -out /export/https.pem 4096
+docker run -it --rm -v kratos_certs:/export alpine/openssl req -new -x509 -sha256 -key /export/https.pem -out /export/https.crt -days 3650 -subj "/C=GB/ST=London/L=London/O=Global Security/OU=IT Department/CN=example.com"
+docker run -it --rm -v kratos_certs:/export ubuntu bash -c "chmod -R 777 /export/"
+
+docker run -it --rm -v keto_certs:/export -v cockroach1_certs:/priv ubuntu bash -c "cp /priv/*.keto.* /export ; cp /priv/ca.crt /export"
+docker run -it --rm -v keto_certs:/export alpine/openssl genrsa -out /export/https.pem 4096
+docker run -it --rm -v keto_certs:/export alpine/openssl req -new -x509 -sha256 -key /export/https.pem -out /export/https.crt -days 3650 -subj "/C=GB/ST=London/L=London/O=Global Security/OU=IT Department/CN=example.com"
+docker run -it --rm -v keto_certs:/export ubuntu bash -c "chmod -R 777 /export/"
+
+docker run -it --rm -v selfserv_certs:/export alpine/openssl genrsa -out /export/https.pem 4096
+docker run -it --rm -v selfserv_certs:/export alpine/openssl req -new -x509 -sha256 -key /export/https.pem -out /export/https.crt -days 3650 -subj "/C=GB/ST=London/L=London/O=Global Security/OU=IT Department/CN=example.com"
+docker run -it --rm -v selfserv_certs:/export ubuntu bash -c "chmod -R 777 /export/"
+
+docker run -it --rm -v consent_certs:/export alpine/openssl genrsa -out /export/https.pem 4096
+docker run -it --rm -v consent_certs:/export alpine/openssl req -new -x509 -sha256 -key /export/https.pem -out /export/https.crt -days 3650 -subj "/C=GB/ST=London/L=London/O=Global Security/OU=IT Department/CN=example.com"
+docker run -it --rm -v consent_certs:/export ubuntu bash -c "chmod -R 777 /export/"
+
+cd ..
+cd or_hydra
+
+docker-compose up --no-start
+docker-compose run hydra migrate sql -e -y
+docker-compose up -d
+
+cd ..
+cd or_kratos
+
+docker-compose up --no-start
+docker-compose run kratos migrate sql -e -y
+docker-compose up -d
+
+cd ..
+cd or_keto
+
+docker-compose up --no-start
+docker-compose run keto migrate up -y
+docker-compose up -d
+
+cd ..
+
+cd or_selfserv
+docker-compose up -d
+cd ..
+
+cd or_consent
+docker-compose up -d
+cd ..
+
+docker-compose -f or_traefik/docker-compose.yml up -d

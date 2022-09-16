@@ -1,0 +1,14 @@
+version: v0.8.0-alpha.2
+
+log:
+  level: debug
+
+serve:
+  read:
+    host: 100.64.64.42
+    port: 4466
+  write:
+    host: 100.64.64.42
+    port: 4467
+
+dsn: cockroach://keto@cockroach1:26257/keto?sslmode=verify-full&application_name=keto&sslcert=/private/client.keto.crt&sslkey=/private/client.keto.key&sslrootcert=/private/ca.crt

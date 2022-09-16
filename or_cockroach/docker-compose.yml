@@ -1,0 +1,268 @@
+version: "3.8"
+
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.0.0/29
+  cluster:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.65.72/29
+    internal: true
+  ingress1:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.65.0/29
+    internal: true
+  ingress2:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.65.8/29
+    internal: true
+  ingress3:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.65.16/29
+    internal: true
+  hydra1:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.65.24/29
+    internal: true
+  hydra2:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.65.32/29
+    internal: true
+  hydra3:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.65.40/29
+    internal: true
+  kratos1:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.65.48/29
+    internal: true
+  kratos2:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.65.56/29
+    internal: true
+  kratos3:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.65.64/29
+    internal: true
+  keto1:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.65.96/29
+    internal: true
+  keto2:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.65.80/29
+    internal: true
+  keto3:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.65.88/29
+    internal: true
+
+
+services:
+  cockroach1:
+    restart: on-failure:1
+    hostname: cockroach1
+    image: docker.io/cockroachdb/cockroach:${COCKROACH_VERSION}
+    command:
+      - 'start'
+      - '--certs-dir=/certs'
+      - '--store=node1'
+      - '--listen-addr=:26257'
+      - '--join=100.64.65.74,100.64.65.75,100.64.65.76'
+      - '--http-addr=100.64.65.2:443'
+    environment:
+      LANG: en_US.utf8
+      TZ: UTC
+    ulimits:
+      nproc: 10240
+      nofile:
+        soft: 10240
+        hard: 10240
+    networks:
+      default:
+        ipv4_address: 100.64.0.2
+      ingress1:
+        ipv4_address: 100.64.65.2
+      hydra1:
+        ipv4_address: 100.64.65.26
+      kratos1:
+        ipv4_address: 100.64.65.50
+      keto1:
+        ipv4_address: 100.64.65.98
+      cluster:
+        ipv4_address: 100.64.65.74
+    extra_hosts:
+      - "cockroach1:100.64.65.74"
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE_COCKROACH}"
+      - "traefik.docker.network=or_cockroach_ingress1"
+      - "traefik.http.routers.cockroach.entrypoints=websecure"
+      - "traefik.http.routers.cockroach.rule=Host(`${TRAEFIK_CR_URL}.${HOSTNAME_LOCAL}`, `${TRAEFIK_CR_URL}.${HOSTNAME_GLOBAL}`)"
+      - "traefik.http.routers.cockroach.tls=true"
+      - "traefik.http.routers.cockroach.tls.certresolver=${TRAEFIK_CR_SSL}"
+      - "traefik.http.routers.cockroach.tls.domains[0].main=${TRAEFIK_CR_URL}.${HOSTNAME_LOCAL}"
+      - "traefik.http.routers.cockroach.tls.domains[0].sans=${TRAEFIK_CR_URL}.${HOSTNAME_GLOBAL}"
+      - "traefik.http.services.cockroach.loadbalancer.server.scheme=https"
+      - "traefik.http.services.cockroach.loadbalancer.server.port=443"
+    volumes:
+      - type: volume
+        source: cockroach1_certs
+        target: /certs
+        volume:
+          nocopy: false
+      - type: volume
+        source: cockroach1_priv
+        target: /my-safe-directory
+        volume:
+          nocopy: false
+      - type: volume
+        source: cockroach1_data
+        target: /cockroach/node1
+        volume:
+          nocopy: false
+  cockroach2:
+    restart: on-failure:1
+    hostname: cockroach2
+    image: docker.io/cockroachdb/cockroach:${COCKROACH_VERSION}
+    command:
+      - 'start'
+      - '--certs-dir=/certs'
+      - '--store=node2'
+      - '--listen-addr=:26257'
+      - '--join=100.64.65.74,100.64.65.75,100.64.65.76'
+      - '--http-addr=100.64.65.10:443'
+    environment:
+      LANG: en_US.utf8
+      TZ: UTC
+    ulimits:
+      nproc: 10240
+      nofile:
+        soft: 10240
+        hard: 10240
+    networks:
+      default:
+        ipv4_address: 100.64.0.3
+      ingress2:
+        ipv4_address: 100.64.65.10
+      hydra2:
+        ipv4_address: 100.64.65.34
+      kratos2:
+        ipv4_address: 100.64.65.58
+      keto2:
+        ipv4_address: 100.64.65.82
+      cluster:
+        ipv4_address: 100.64.65.75
+    extra_hosts:
+      - "cockroach2:100.64.65.75"
+    volumes:
+      - type: volume
+        source: cockroach2_certs
+        target: /certs
+        volume:
+          nocopy: false
+      - type: volume
+        source: cockroach2_priv
+        target: /my-safe-directory
+        volume:
+          nocopy: false
+      - type: volume
+        source: cockroach2_data
+        target: /cockroach/node2
+        volume:
+          nocopy: false
+  cockroach3:
+    restart: on-failure:1
+    hostname: cockroach3
+    image: docker.io/cockroachdb/cockroach:${COCKROACH_VERSION}
+    command:
+      - 'start'
+      - '--certs-dir=/certs'
+      - '--store=node3'
+      - '--listen-addr=:26257'
+      - '--join=100.64.65.74,100.64.65.75,100.64.65.76'
+      - '--http-addr=100.64.65.18:443'
+    environment:
+      LANG: en_US.utf8
+      TZ: UTC
+    ulimits:
+      nproc: 10240
+      nofile:
+        soft: 10240
+        hard: 10240
+    networks:
+      default:
+        ipv4_address: 100.64.0.4
+      ingress3:
+        ipv4_address: 100.64.65.18
+      hydra3:
+        ipv4_address: 100.64.65.42
+      kratos3:
+        ipv4_address: 100.64.65.66
+      keto3:
+        ipv4_address: 100.64.65.90
+      cluster:
+        ipv4_address: 100.64.65.76
+    extra_hosts:
+      - "cockroach3:100.64.65.76"
+    volumes:
+      - type: volume
+        source: cockroach3_certs
+        target: /certs
+        volume:
+          nocopy: false
+      - type: volume
+        source: cockroach3_priv
+        target: /my-safe-directory
+        volume:
+          nocopy: false
+      - type: volume
+        source: cockroach3_data
+        target: /cockroach/node3
+        volume:
+          nocopy: false
+
+
+volumes:
+  cockroach1_certs:
+    external: true
+  cockroach1_priv:
+    external: true
+  cockroach2_certs:
+    external: true
+  cockroach2_priv:
+    external: true
+  cockroach3_certs:
+    external: true
+  cockroach3_priv:
+    external: true
+  cockroach1_data:
+  cockroach2_data:
+  cockroach3_data:

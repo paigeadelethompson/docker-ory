@@ -1,0 +1,87 @@
+version: "3.8"
+
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.0.32/30
+  ingress:
+    enable_ipv6: false
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.64.16/29
+    internal: true
+  selfserv:
+    enable_ipv6: false
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.64.48/29
+    internal: true
+  cockroach1:
+    external:
+      name: or_cockroach_kratos1
+  cockroach2:
+    external:
+      name: or_cockroach_kratos2
+  cockroach3:
+    external:
+      name: or_cockroach_kratos3
+
+services:
+  kratos:
+    restart: on-failure:1
+    hostname: kratos
+    image: oryd/kratos:${KRATOS_VERSION}
+    command: "serve -c /home/ory/config.yaml"
+    environment:
+      LANG: en_US.utf8
+      TZ: UTC
+    ulimits:
+      nproc: 10240
+      nofile:
+        soft: 10240
+        hard: 10240
+    networks:
+      default:
+        ipv4_address: 100.64.0.34
+      ingress:
+        ipv4_address: 100.64.64.18
+      selfserv:
+        ipv4_address: 100.64.64.50
+      cockroach1:
+        ipv4_address: 100.64.65.51
+      cockroach2:
+        ipv4_address: 100.64.65.59
+      cockroach3:
+        ipv4_address: 100.64.65.67
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE_KRATOS}"
+      - "traefik.docker.network=or_kratos_ingress"
+      - "traefik.http.routers.kratos.service=kratos"
+      - "traefik.http.routers.kratos.entrypoints=websecure"
+      - "traefik.http.routers.kratos.rule=Host(`${KRATOS_HOSTNAME}.${HOSTNAME_LOCAL}`, `${KRATOS_HOSTNAME}.${HOSTNAME_GLOBAL}`)"
+      - "traefik.http.routers.kratos.tls=true"
+      - "traefik.http.routers.kratos.tls.certresolver=${TRAEFIK_KRATOS_SSL}"
+      - "traefik.http.routers.kratos.tls.domains[0].main=${KRATOS_HOSTNAME}.${HOSTNAME_LOCAL}"
+      - "traefik.http.routers.kratos.tls.domains[0].sans=${KRATOS_HOSTNAME}.${HOSTNAME_GLOBAL}"
+      - "traefik.http.services.kratos.loadbalancer.server.port=4433"
+      - "traefik.http.services.kratos.loadbalancer.server.scheme=https"
+    extra_hosts:
+      - "cockroach1:100.64.65.50"
+      - "cockroach2:100.64.65.58"
+      - "cockroach3:100.64.65.66"
+    volumes:
+      - ../config/kratos/config.yaml:/home/ory/config.yaml:rw
+      - ../config/kratos/person.schema.json:/person.schema.json:ro
+      - type: volume
+        source: kratos_certs
+        target: /private
+        volume:
+          nocopy: false
+
+volumes:
+  kratos_certs:
+    external: true

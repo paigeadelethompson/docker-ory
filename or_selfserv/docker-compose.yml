@@ -1,0 +1,72 @@
+version: "3.8"
+
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.0.12/30
+  ingress:
+    enable_ipv6: false
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.64.8/29
+    internal: true
+  kratos:
+    external:
+      name: or_kratos_selfserv
+
+services:
+  selfserv:
+    restart: on-failure:1
+    hostname: selfserv
+    image: oryd/kratos-selfservice-ui-node:${SELFSERV_VERSION}
+    environment:
+      LANG: en_US.utf8
+      TZ: UTC
+      TLS_KEY_PATH: /private/https.pem
+      TLS_CERT_PATH: /private/https.crt
+      SECURITY_MODE: cookie
+      BASE_URL: https://${SELFSERV_HOSTNAME}.${HOSTNAME_GLOBAL}
+      KRATOS_PUBLIC_URL: https://${KRATOS_HOSTNAME}.${HOSTNAME_GLOBAL}:4433
+      KRATOS_ADMIN_URL: https://${KRATOS_ADMIN_HOSTNAME}.${HOSTNAME_GLOBAL}:4434
+      KRATOS_BROWSER_URL: https://${KRATOS_HOSTNAME}.${HOSTNAME_GLOBAL}
+      NODE_TLS_REJECT_UNAUTHORIZED: ${SELFSERV_NODE_TLS_REJECT_UNAUTHORIZED}
+      SQA_OPT_OUT: "true"
+    ulimits:
+      nproc: 10240
+      nofile:
+        soft: 10240
+        hard: 10240
+    networks:
+      default:
+        ipv4_address: 100.64.0.14
+      ingress:
+        ipv4_address: 100.64.64.10
+      kratos:
+        ipv4_address: 100.64.64.51
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE_SELFSERV}"
+      - "traefik.docker.network=or_selfserv_ingress"
+      - "traefik.http.routers.selfserv.entrypoints=websecure"
+      - "traefik.http.routers.selfserv.rule=Host(`${SELFSERV_HOSTNAME}.${HOSTNAME_LOCAL}`, `${SELFSERV_HOSTNAME}.${HOSTNAME_GLOBAL}`)"
+      - "traefik.http.routers.selfserv.tls=true"
+      - "traefik.http.routers.selfserv.tls.certresolver=${TRAEFIK_SELFSERV_SSL}"
+      - "traefik.http.routers.selfserv.tls.domains[0].main=${SELFSERV_HOSTNAME}.${HOSTNAME_LOCAL}"
+      - "traefik.http.routers.selfserv.tls.domains[0].sans=${SELFSERV_HOSTNAME}.${HOSTNAME_GLOBAL}"
+      - "traefik.http.services.selfserv.loadbalancer.server.port=3000"
+      - "traefik.http.services.selfserv.loadbalancer.server.scheme=https"
+    extra_hosts:
+      - "${KRATOS_HOSTNAME}.${HOSTNAME_GLOBAL}:100.64.64.50"
+      - "${KRATOS_ADMIN_HOSTNAME}.${HOSTNAME_GLOBAL}:100.64.64.50"
+    volumes:
+      - type: volume
+        source: selfserv_certs
+        target: /private
+        volume:
+          nocopy: false
+
+volumes:
+  selfserv_certs:
+      external: true

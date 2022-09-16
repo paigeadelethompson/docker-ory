@@ -1,0 +1,82 @@
+version: "3.8"
+
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.0.24/30
+  ingress:
+    enable_ipv6: false
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.64.40/29
+    internal: true
+  cockroach1:
+    external:
+      name: or_cockroach_keto1
+  cockroach2:
+    external:
+      name: or_cockroach_keto2
+  cockroach3:
+    external:
+      name: or_cockroach_keto3
+
+services:
+  keto:
+    restart: on-failure:1
+    hostname: keto
+    image: oryd/keto:${KETO_VERSION}
+    environment:
+      LANG: en_US.utf8
+      TZ: UTC
+      SQA_OPT_OUT: "true"
+    ulimits:
+      nproc: 10240
+      nofile:
+        soft: 10240
+        hard: 10240
+    networks:
+      default:
+        ipv4_address: 100.64.0.26
+      ingress:
+        ipv4_address: 100.64.64.42
+      cockroach1:
+        ipv4_address: 100.64.65.99
+      cockroach2:
+        ipv4_address: 100.64.65.83
+      cockroach3:
+        ipv4_address: 100.64.65.91
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE_KETO}"
+      - "traefik.docker.network=or_keto_ingress"
+      - "traefik.http.routers.ketoread.entrypoints=websecure"
+      - "traefik.http.routers.ketoread.rule=Host(`${KETO_HOSTNAME}-r.${HOSTNAME_LOCAL}`, `${KETO_HOSTNAME}-r.${HOSTNAME_GLOBAL}`)"
+      - "traefik.http.routers.ketoread.tls=true"
+      - "traefik.http.routers.ketoread.tls.certresolver=${TRAEFIK_KETO_SSL}"
+      - "traefik.http.routers.ketoread.tls.domains[0].main=${KETO_HOSTNAME}-r.${HOSTNAME_LOCAL}"
+      - "traefik.http.routers.ketoread.tls.domains[0].sans=${KETO_HOSTNAME}-r.${HOSTNAME_GLOBAL}"
+      - "traefik.http.services.ketoread.loadbalancer.server.port=4466"
+      - "traefik.http.routers.ketowrite.entrypoints=websecure"
+      - "traefik.http.routers.ketowrite.rule=Host(`${KETO_HOSTNAME}-w.${HOSTNAME_LOCAL}`, `${KETO_HOSTNAME}-w.${HOSTNAME_GLOBAL}`)"
+      - "traefik.http.routers.ketowrite.tls=true"
+      - "traefik.http.routers.ketowrite.tls.certresolver=${TRAEFIK_KETO_SSL}"
+      - "traefik.http.routers.ketowrite.tls.domains[0].main=${KETO_HOSTNAME}-w.${HOSTNAME_LOCAL}"
+      - "traefik.http.routers.ketowrite.tls.domains[0].sans=${KETO_HOSTNAME}-w.${HOSTNAME_GLOBAL}"
+      - "traefik.http.services.ketowrite.loadbalancer.server.port=4467"
+    extra_hosts:
+      - "cockroach1:100.64.65.98"
+      - "cockroach2:100.64.65.82"
+      - "cockroach3:100.64.65.90"
+    volumes:
+      - ../config/keto/keto.yml:/home/ory/keto.yml:ro
+      - type: volume
+        source: keto_certs
+        target: /private
+        volume:
+          nocopy: false
+
+volumes:
+  keto_certs:
+    external: true

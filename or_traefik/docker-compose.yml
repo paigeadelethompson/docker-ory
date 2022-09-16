@@ -1,0 +1,102 @@
+version: '2.4'
+
+networks:
+  default:
+    enable_ipv6: false
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.48.4/30
+  hydra:
+    external:
+      name: or_hydra_ingress
+  kratos:
+    external:
+      name: or_kratos_ingress
+  selfserv:
+    external:
+      name: or_selfserv_ingress
+  cockroach1:
+    external:
+      name: or_cockroach_ingress1
+  cockroach2:
+    external:
+      name: or_cockroach_ingress2
+  cockroach3:
+    external:
+      name: or_cockroach_ingress3
+
+services:
+ traefik:
+    restart: on-failure:1
+    image: "traefik:v2.8.1"
+    container_name: "traefik"
+    environment:
+    command:
+      - "--serverstransport.insecureskipverify=true"
+      - "--api.insecure=false"
+      - "--api.dashboard=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=100.64.48.6:80"
+      - "--entrypoints.websecure.address=100.64.48.6:443"
+      - "--entryPoints.web.forwardedHeaders.trustedIPs=${TRAEFIK_FRONTEND_ADDRESSES}"
+      - "--entryPoints.web.proxyProtocol.trustedIPs=${TRAEFIK_FRONTEND_ADDRESSES}"
+      - "--entryPoints.websecure.proxyProtocol.trustedIPs=${TRAEFIK_FRONTEND_ADDRESSES}"
+      - "--certificatesresolvers.sg.acme.storage=/opt/traefik/zerossl.json"
+      - "--certificatesresolvers.sg.acme.caserver=${TRAEFIK_SG_CA_SERVER}"
+      - "--certificatesresolvers.sg.acme.email=${TRAEFIK_EMAIL}"
+      - "--certificatesresolvers.sg.acme.httpchallenge=${TRAEFIK_HTTP_CHALLENGE}"
+      - "--certificatesresolvers.sg.acme.dnsChallenge.resolvers=${TRAEFIK_DNS_RESOLVERS}"
+      - "--certificatesresolvers.sg.acme.dnsChallenge.disablePropagationCheck=${TRAEFIK_DISABLE_DNS_PROPAGATION_CHECK}"
+      - "--certificatesresolvers.sg.acme.dnsChallenge.delaybeforecheck=${TRAEFIK_DNS_DELAY}"
+      - "--certificatesresolvers.sg.acme.dnsChallenge=${TRAEFIK_DNS_CHALLENGE}"
+      - "--certificatesresolvers.sg.acme.dnsChallenge.provider=${TRAEFIK_DNS_CHALLENGE_PROVIDER}"
+      - "--certificatesresolvers.sg.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.sg.acme.eab.kid=${TRAEFIK_SG_KID}"
+      - "--certificatesresolvers.sg.acme.eab.hmacEncoded=${TRAEFIK_SG_HMAC}"
+      - "--certificatesresolvers.le.acme.storage=/opt/traefik/letsencrypt.json"
+      - "--certificatesresolvers.le.acme.caserver=${TRAEFIK_LE_CA_SERVER}"
+      - "--certificatesresolvers.le.acme.httpchallenge=${TRAEFIK_HTTP_CHALLENGE}"
+      - "--certificatesresolvers.le.acme.dnsChallenge.resolvers=${TRAEFIK_DNS_RESOLVERS}"
+      - "--certificatesresolvers.le.acme.dnsChallenge.disablePropagationCheck=${TRAEFIK_DISABLE_DNS_PROPAGATION_CHECK}"
+      - "--certificatesresolvers.le.acme.dnsChallenge.delaybeforecheck=${TRAEFIK_DNS_DELAY}"
+      - "--certificatesresolvers.le.acme.dnsChallenge=${TRAEFIK_DNS_CHALLENGE}"
+      - "--certificatesresolvers.le.acme.dnsChallenge.resolvers=${TRAEFIK_DNS_RESOLVERS}"
+      - "--certificatesresolvers.le.acme.dnsChallenge.delaybeforecheck=${TRAEFIK_DNS_DELAY}"
+      - "--certificatesresolvers.le.acme.dnsChallenge.provider=${TRAEFIK_DNS_CHALLENGE_PROVIDER}"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.le.acme.email=${TRAEFIK_EMAIL}"
+      - "--log.level=${TRAEFIK_LOG_LEVEL}"
+    volumes:
+      - type: volume
+        source: traefik
+        target: /opt/traefik
+        volume:
+          nocopy: false
+      - "/run/docker.sock:/var/run/docker.sock:ro"
+    dns:
+      - 4.2.2.2
+    networks:
+      default:
+        ipv4_address: 100.64.48.6
+      hydra:
+        ipv4_address: 100.64.64.3
+      kratos:
+        ipv4_address: 100.64.64.19
+      selfserv:
+        ipv4_address: 100.64.64.11
+      cockroach1:
+        ipv4_address: 100.64.65.3
+      cockroach2:
+        ipv4_address: 100.64.65.11
+      cockroach3:
+        ipv4_address: 100.64.65.19
+    ulimits:
+      nproc: 10240
+      nofile:
+        soft: 10240
+        hard: 10240
+
+volumes:
+  traefik:

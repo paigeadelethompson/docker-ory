@@ -1,0 +1,97 @@
+version: "3.8"
+
+# https://github.com/ory/kratos/discussions/937#discussioncomment-270821
+# https://community.ory.sh/t/running-on-local-development/1662/4
+# https://github.com/Davide-Gheri/kratos-hydra-selfservice-ui
+
+#https://github.com/ory/hydra/blob/master/quickstart-cors.yml
+
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.0.8/30
+  ingress:
+    enable_ipv6: false
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.64.0/29
+    internal: true
+  cockroach1:
+    external:
+      name: or_cockroach_hydra1
+  cockroach2:
+    external:
+      name: or_cockroach_hydra2
+  cockroach3:
+    external:
+      name: or_cockroach_hydra3
+
+services:
+  hydra:
+    restart: on-failure:1
+    hostname: hydra
+    image: oryd/hydra
+    environment:
+      LANG: en_US.utf8
+      TZ: UTC
+      HTTPS_TLS_CERT_PATH: /certs/https.pem
+      HTTPS_TLS_KEY_PATH: /certs/https.pem
+      SECRETS_SYSTEM: ${HYDRA_SECRETS_SYSTEM}
+      DSN: ${HYDRA_DSN}
+      HYDRA_PUBLIC_URL: https://${HYDRA_HOSTNAME}.${HOSTNAME_GLOBAL}
+      HYDRA_ADMIN_URL: https://${HYDRA_ADMIN_HOSTNAME}.${HOSTNAME_GLOBAL}
+      URLS_CONSENT: https://${HYDRA_HOSTNAME}.${HOSTNAME_GLOBAL}/consent
+      URLS_LOGIN: https://${HYDRA_HOSTNAME}.${HOSTNAME_GLOBAL}/login
+      URLS_LOGOUT: https://${HYDRA_HOSTNAME}.${HOSTNAME_GLOBAL}/logout
+      OIDC_SUBJECT_IDENTIFIERS_SUPPORTED_TYPES: ${HYDRA_OIDC_SUBJECT_IDENTIFIERS_SUPPORTED_TYPES}
+      OIDC_SUBJECT_IDENTIFIERS_PAIRWISE_SALT: ${HYDRA_OIDC_SUBJECT_IDENTIFIERS_PAIRWISE_SALT}
+      SERVE_COOKIES_SAME_SITE_MODE: ${HYDRA_SERVE_COOKIES_SAME_SITE_MODE}
+      LOG_LEAK_SENSITIVE_VALUES: ${ORY_LOG_LEAK_SENSITIVE_VALUES}
+      LOG_LEVEL: ${ORY_LOG_LEVEL}
+      SQA_OPT_OUT: "true"
+    ulimits:
+      nproc: 10240
+      nofile:
+        soft: 10240
+        hard: 10240
+    networks:
+      default:
+        ipv4_address: 100.64.0.10
+      ingress:
+        ipv4_address: 100.64.64.2
+      cockroach1:
+        ipv4_address: 100.64.65.27
+      cockroach2:
+        ipv4_address: 100.64.65.35
+      cockroach3:
+        ipv4_address: 100.64.65.43
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE_HYDRA}"
+      - "traefik.docker.network=or_hydra_ingress"
+      - "traefik.http.routers.hydra.service=hydra"
+      - "traefik.http.routers.hydra.entrypoints=websecure"
+      - "traefik.http.routers.hydra.rule=Host(`${HYDRA_HOSTNAME}.${HOSTNAME_LOCAL}`, `${HYDRA_HOSTNAME}.${HOSTNAME_GLOBAL}`)"
+      - "traefik.http.routers.hydra.tls=true"
+      - "traefik.http.routers.hydra.tls.certresolver=${TRAEFIK_HYDRA_SSL}"
+      - "traefik.http.routers.hydra.tls.domains[0].main=${HYDRA_HOSTNAME}.${HOSTNAME_LOCAL}"
+      - "traefik.http.routers.hydra.tls.domains[0].sans=${HYDRA_HOSTNAME}.${HOSTNAME_GLOBAL}"
+      - "traefik.http.services.hydra.loadbalancer.server.port=4444"
+      - "traefik.http.services.hydra.loadbalancer.server.scheme=https"
+
+    extra_hosts:
+      - "cockroach1:100.64.65.26"
+      - "cockroach2:100.64.65.34"
+      - "cockroach3:100.64.65.42"
+    volumes:
+      - type: volume
+        source: hydra_certs
+        target: /private
+        volume:
+          nocopy: false
+
+volumes:
+  hydra_certs:
+    external: true

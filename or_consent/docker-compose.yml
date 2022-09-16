@@ -1,0 +1,46 @@
+version: "3.8"
+
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.0.16/30
+  ingress:
+    enable_ipv6: false
+    ipam:
+      driver: default
+      config:
+        - subnet: 100.64.64.24/29
+    internal: true
+
+services:
+  consent:
+    restart: on-failure:1
+    hostname: consent
+    image: oryd/hydra-login-consent-node:${CONSENT_VERSION}
+    environment:
+      LANG: en_US.utf8
+      TZ: UTC
+      HYDRA_ADMIN_URL: http://${HYDRA_ADMIN_HOSTNAME}.${HOSTNAME_GLOBAL}
+      SQA_OPT_OUT: "true"
+    ulimits:
+      nproc: 10240
+      nofile:
+        soft: 10240
+        hard: 10240
+    networks:
+      default:
+        ipv4_address: 100.64.0.18
+      ingress:
+        ipv4_address: 100.64.64.26
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE_CONSENT}"
+      - "traefik.docker.network=or_consent_ingress"
+      - "traefik.http.routers.consent.entrypoints=websecure"
+      - "traefik.http.routers.consent.rule=Host(`${CONSENT_HOSTNAME}.${HOSTNAME_LOCAL}`, `${CONSENT_HOSTNAME}.${HOSTNAME_GLOBAL}`)"
+      - "traefik.http.routers.consent.tls=true"
+      - "traefik.http.routers.consent.tls.certresolver=${TRAEFIK_CONSENT_SSL}"
+      - "traefik.http.routers.consent.tls.domains[0].main=${CONSENT_HOSTNAME}.${HOSTNAME_LOCAL}"
+      - "traefik.http.routers.consent.tls.domains[0].sans=${CONSENT_HOSTNAME}.${HOSTNAME_GLOBAL}"
+      - "traefik.http.services.consent.loadbalancer.server.port=3000"

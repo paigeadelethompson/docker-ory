@@ -1,0 +1,237 @@
+identity:
+  schemas:
+    - id: Person
+      url: file:///person.schema.json
+  default_schema_id: "Person"
+dsn: "cockroach://kratos@cockroach1:26257/kratos?sslmode=verify-full&application_name=kratos&sslcert=/private/client.kratos.crt&sslkey=/private/client.kratos.key&sslrootcert=/private/ca.crt"
+selfservice:
+  default_browser_return_url: https://selfserv.invalid.tld/dashboard
+  flows:
+    logout:
+      after:
+        default_browser_return_url: https://selfserv.invalid.tld/dashboard
+    registration:
+      ui_url: https://selfserv.invalid.tld/registration
+      lifespan: 1h
+      after:
+        password:
+          hooks:
+            - hook: session
+          default_browser_return_url: https://selfserv.invalid.tld/dashboard
+        default_browser_return_url: https://selfserv.invalid.tld/dashboard
+      enabled: true
+    login:
+      lifespan: 1h
+      after:
+        password:
+          hooks:
+            - hook: revoke_active_sessions
+          default_browser_return_url: https://selfserv.invalid.tld/dashboard
+        default_browser_return_url: https://selfserv.invalid.tld/dashboard
+      ui_url: https://selfserv.invalid.tld/login
+    verification:
+      ui_url: https://selfserv.invalid.tld/verify
+      after:
+        default_browser_return_url: https://selfserv.invalid.tld/dashboard
+      lifespan: 1h
+      enabled: false
+    recovery:
+      ui_url: https://selfserv.invalid.tld/verify
+      after:
+        default_browser_return_url: https://selfserv.invalid.tld/dashboard
+      lifespan: 1h
+      enabled: false
+    error:
+      ui_url: https://selfserv.invalid.tld/error
+    settings:
+      lifespan: 1h
+      privileged_session_max_age: 1h
+      required_aal: aal1
+      after:
+        password:
+          default_browser_return_url: https://selfserv.invalid.tld/dashboard
+        profile:
+          default_browser_return_url: https://selfserv.invalid.tld/dashboard
+        default_browser_return_url: https://selfserv.invalid.tld/dashboard
+      ui_url: https://selfserv.invalid.tld/user/settings
+  methods:
+    link:
+      config:
+        lifespan: 1h
+        base_url: https://invalid.tld
+      enabled: false
+    password:
+      config:
+        haveibeenpwned_enabled: false
+        max_breaches: 0
+        ignore_network_errors: false
+        min_password_length: 6
+        identifier_similarity_check_enabled: false
+        haveibeenpwned_host: ""
+      enabled: false
+    totp:
+      config:
+        issuer: ""
+      enabled: false
+    lookup_secret:
+      enabled: false
+    profile:
+      enabled: false
+  allowed_return_urls:
+    - https://selfserv.invalid.tld/dashboard
+    - /dashboard
+    - https://invalid.tld/
+courier:
+  smtp:
+    connection_uri: smtps://foo:bar@my-mailserver:1234/?skip_ssl_verify=false
+    client_key_path: ""
+    from_address: aaa@a.aa
+    from_name: Bob
+    headers:
+      X-SES-SOURCE-ARN: arn:aws:ses:us-west-2:123456789012:identity/example.com
+      X-SES-FROM-ARN: arn:aws:ses:us-west-2:123456789012:identity/example.com
+      X-SES-RETURN-PATH-ARN: arn:aws:ses:us-west-2:123456789012:identity/example.com
+    local_name: ""
+    client_cert_path: ""
+  template_override_path: /conf/courier-templates
+  message_ttl: 1h
+  sms:
+    from: ""
+    request_config:
+      url: https://api.twillio.com/sms/send
+      method: ""
+      body: file:///path/to/body.jsonnet
+      auth:
+        type: api_key
+        config:
+          name: ""
+          value: ""
+          in: header
+    enabled: false
+  templates:
+    verification:
+      valid:
+        email:
+          subject: file://path/to/subject.gotmpl
+          body:
+            html: file://path/to/body.html.gotmpl
+            plaintext: file://path/to/body.plaintext.gotmpl
+      invalid:
+        email:
+          subject: file://path/to/subject.gotmpl
+          body:
+            html: file://path/to/body.html.gotmpl
+            plaintext: file://path/to/body.plaintext.gotmpl
+    recovery:
+      valid:
+        email:
+          subject: file://path/to/subject.gotmpl
+          body:
+            html: file://path/to/body.html.gotmpl
+            plaintext: file://path/to/body.plaintext.gotmpl
+      invalid:
+        email:
+          subject: file://path/to/subject.gotmpl
+          body:
+            html: file://path/to/body.html.gotmpl
+            plaintext: file://path/to/body.plaintext.gotmpl
+serve:
+  public:
+    cors:
+      allowed_origins:
+        - https://invalid.tld
+        - https://*.invalid.tld
+        - https://*.my.sub.domain.invalid.tld
+      allowed_methods:
+        - POST
+      allowed_headers:
+        - ""
+      exposed_headers:
+        - ""
+      allow_credentials: false
+      options_passthrough: false
+      max_age: 0
+      debug: false
+      enabled: false
+    base_url: https://invalid.tld/
+    host: ""
+    port: 4433
+    socket:
+      group: ""
+      mode: 0
+      owner: ""
+    tls:
+      cert:
+        path: /private/https.crt
+      key:
+        path: /private/https.pem
+    request_log:
+      disable_for_health: false
+  admin:
+    base_url: https://kratos-admin.invalid.tld:4434/
+    host: ""
+    port: 4434
+    socket:
+      group: ""
+      mode: 0
+      owner: ""
+    tls:
+      cert:
+        path: /private/https.crt
+      key:
+        path: /private/https.pem
+    request_log:
+      disable_for_health: false
+log:
+  leak_sensitive_values: false
+  redaction_text: ""
+  format: json
+  level: trace
+secrets:
+  cookie:
+    - ipsumipsumipsumi
+  cipher:
+    - ipsumipsumipsumipsumipsumipsumip
+  default:
+    - ipsumipsumipsumi
+hashers:
+  argon2:
+    iterations: 1
+    parallelism: 1
+    salt_length: 16
+    key_length: 16
+    expected_duration: 0ns
+    expected_deviation: 0ns
+    dedicated_memory: 0B
+    memory: 0B
+  bcrypt:
+    cost: 4
+  algorithm: argon2
+ciphers:
+  algorithm: noop
+cookies:
+  path: "/"
+  same_site: Lax
+  domain: ".invalid.tld"
+session:
+  lifespan: 1h
+  cookie:
+    name: ""
+    persistent: false
+    path: "/"
+    same_site: Lax
+    domain: ".invalid.tld"
+  earliest_possible_extend: 1h
+  whoami:
+    required_aal: aal1
+version: v0.5.0-alpha.1
+dev: true
+help: true
+sqa-opt-out: true
+watch-courier: false
+expose-metrics-port: 4434
+config:
+  - ""
+clients:
+  http:
+    disallow_private_ip_ranges: false
