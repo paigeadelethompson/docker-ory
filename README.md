@@ -1,3 +1,6 @@
+# Unmaintained / shelved 
+until further notice
+
 # Docker Ory
 This environment sets up a full Ory environment (Hydra, Kratos, Keto, OathKeeper, and the self service UI) for setting up and running your own OpenID infrastructure. 
 It includes setting up a production valid CockroachDB cluster. It is reccomended that you use a clean VM and a dedicated install of Docker
